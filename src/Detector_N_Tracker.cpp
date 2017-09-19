@@ -12,8 +12,8 @@
 #include <caffe/util/io.hpp>
 #include <ctime>
 
-bool Detector_N_Tracker::init( const string& video_name , const int& detection_gap ,
-                              const float& detection_threshold  )
+void Detector_N_Tracker::init( const string& video_name , const int& detection_gap ,
+                            const float& detection_threshold , const float& resize_ratio)
 {
     using namespace std;
     video_name_ = video_name;
@@ -33,20 +33,27 @@ bool Detector_N_Tracker::init( const string& video_name , const int& detection_g
     
     bbox_.resize( frame_number_ );
     
-    CHECK(cap_.read(frame_)) << "cannot open the video when initing";
+    cv::Mat frame_in;
+    CHECK(cap_.read(frame_in)) << "cannot open the video when initing";
+    
+    if ( fabs( resize_ratio - 1. ) > 1.E-5 )
+    {
+        cv::Size resize_size( frame_in.cols * resize_ratio , frame_in.rows * resize_ratio );
+        ifResize_ = true;
+        resize_size_ = resize_size;
+        cv::resize( frame_in , frame_ , resize_size );
+    }
+    else
+    {
+        frame_ = frame_in;
+        ifResize_ = false;
+        resize_size_ = cv::Size( frame_in.cols , frame_in.rows );
+    }
+    
+    resize_ratio_ = resize_ratio;
     frame_width_ = frame_.cols;
     frame_heith_ = frame_.rows;
-    
-//    cv::MultiTracker myTracker("KCF");
-    
-//    std::cout << "width= "<< frame_width_ << std::endl;
-    
-    
-//    cout << "frame_number = " << frame_number_ << endl;
-//    cv::imshow( "tt1" , frame_);
-//    cv::waitKey(0);
-    
-    return true;
+
 }
 
 void Detector_N_Tracker::detectFromTo( const int& start , const int& end )
@@ -57,9 +64,10 @@ void Detector_N_Tracker::detectFromTo( const int& start , const int& end )
     
     start_frame_ = start;
     end_frame_ = end;
-    
+
+    cv::Mat frame_in;
     cap_.set( CV_CAP_PROP_POS_FRAMES, start );
-    CHECK( cap_.read(frame_) ) << "CANNOT read the original frame from the video data ";
+    CHECK( cap_.read(frame_in) ) << "CANNOT read the original frame from the video data ";
     bbox_.clear();
     bbox_.resize( end - start );
     // the bbox_ contain every bounding box in every frame;
@@ -70,20 +78,22 @@ void Detector_N_Tracker::detectFromTo( const int& start , const int& end )
     
     for( int Dindex = 0 ; Dindex < detection_time ; ++Dindex )
     {
-        std::cout << "detection start " << std::endl;
         t1 = clock();
         
-        
         cap_.set(  CV_CAP_PROP_POS_FRAMES, start + Dindex * detection_gap_ );
-        CHECK( cap_.read(frame_)) << "cannot read the original frame";
+        CHECK( cap_.read(frame_in)) << "cannot read the original frame";
         
-        cv::Mat frameClone = frame_;
-        vector<vector<float> > detections = detector_.Detect(frameClone);
+        if ( ifResize_ )
+            cv::resize( frame_in , frame_ , resize_size_ );
+        else
+            frame_ = frame_in;
+        
+       // cv::Mat frameClone = frame_;
+        //vector<vector<float> > detections = detector_.Detect(frameClone);
+        vector<vector<float> > detections = detector_.Detect(frame_);
         vector<BBOX> detection_purified;
         
-        
         // detection purified format: [image_id , label , score , x , y , width , height ].
-        
         for (int i = 0; i < detections.size(); ++i)
         {
             const vector<float>& d = detections[i];
@@ -104,12 +114,6 @@ void Detector_N_Tracker::detectFromTo( const int& start , const int& end )
                 detect_tmp.heigh    = int( d[6] * frame_.rows - d[4] * frame_.rows );
                 
                 detection_purified.push_back( detect_tmp);
-                
-//                cv::rectangle( frame_ , cv::Rect(detect_tmp.x ,
-//                                detect_tmp.y , detect_tmp.width ,
-//                                                 detect_tmp.heigh) , cvScalar(255 , 0  ,0) , 2);
-                // TEST
-                
             }
         }// end of detection.size LOOP
         // detecting every possible bounding box in one frame with an invertal.
@@ -117,23 +121,18 @@ void Detector_N_Tracker::detectFromTo( const int& start , const int& end )
         // which was originally trained by Liu Wei,2016. SSD arxiv paper.
         
         t2 = clock();
-        std::cout << "detection end & tracking start" << std::endl;
-//        cv::imshow( "tt1" , frame_);
-//        cv::waitKey(0);
-        // TEST
         
         for ( int i = 0  ; i < detection_purified.size() ; ++ i )
         {
             cap_.set(  CV_CAP_PROP_POS_FRAMES, start + Dindex * detection_gap_ );
-            CHECK( cap_.read(frame_) );
+            CHECK( cap_.read(frame_in) );
+            if ( ifResize_ )
+                cv::resize( frame_in , frame_ , resize_size_ );
+            else
+                frame_ = frame_in;
+            
             cv::Rect2d roi( detection_purified[i].x , detection_purified[i].y ,
                            detection_purified[i].width , detection_purified[i].heigh );
-            
-            
-//            cv::rectangle( frame_ , roi , cv::Scalar( 255 , 0  , 0 ) , 2 );
-//            cv::imshow( "tt1" , frame_);
-//            cv::waitKey(30);
-            // TEST
             
             bbox_[Dindex * detection_gap_].push_back( detection_purified[i] );
             
@@ -142,8 +141,13 @@ void Detector_N_Tracker::detectFromTo( const int& start , const int& end )
             
             for( int Tindex = 0 ; Tindex < detection_gap_ -1 ; Tindex ++ )
             {
-                if ( !cap_.read(frame_) )
+                if ( !cap_.read(frame_in) )
                     break;
+                
+                if ( ifResize_ )
+                    cv::resize( frame_in , frame_ , resize_size_ );
+                else
+                    frame_ = frame_in;
                 
                 tracker_->update(frame_ , roi );
                 
@@ -152,23 +156,10 @@ void Detector_N_Tracker::detectFromTo( const int& start , const int& end )
                 
                 bbox_[Dindex * detection_gap_ + Tindex +1 ].push_back( bbox_tmp );
                 
-                
-//                std::cout << "x = " << roi.x << "  y = " << roi.y << "  width = " << roi.width
-//                <<"  height = " << roi.height << std::endl;
-                
-//                cv::rectangle( frame_ , roi , cv::Scalar( 255 , 0  , 0 ) , 2 );
-//                cv::imshow( "tt1" , frame_);
-//                cv::waitKey(330);
-                // TEST
-                
             }
-//            std::cout << std::endl << std::endl;
-
         }
         
         t3 = clock();
-        std::cout << "tracking end " << std::endl;
-        
         std::cout << "Detecting time = " << float(t2-t1)/CLOCKS_PER_SEC<< "s" << std::endl;
         std::cout << "Tracking time = " << float(t3-t2)/CLOCKS_PER_SEC<<"s" << std::endl << std::endl;
         // tracking every bbox in the original frame, tracking with a length detection_gap_;
@@ -178,15 +169,20 @@ void Detector_N_Tracker::detectFromTo( const int& start , const int& end )
 
 void Detector_N_Tracker::writeToDisk( const string& address , const bool& withLabel , const bool& withScore )
 {
-    cv::VideoWriter writer( address , CV_FOURCC('D','I','V','X') , 10 ,
+    cv::VideoWriter writer( address , CV_FOURCC('D','I','V','X') , 5 ,
                            cv::Size(frame_width_ , frame_heith_) , true);
     
     cap_.set( CV_CAP_PROP_POS_FRAMES , 0 );
     int frame_count = 0;
+    cv::Mat frame_in;
     
-    while( cap_.read(frame_) )
+    while( cap_.read(frame_in) )
     {
-        cv::Mat frameClone = frame_;
+        //cv::Mat frameClone = frame_;
+        if ( ifResize_ )
+            cv::resize( frame_in , frame_ , resize_size_ );
+        else
+            frame_ = frame_in;
         
         if( frame_count >= start_frame_ && frame_count < end_frame_ )
         {
@@ -201,26 +197,35 @@ void Detector_N_Tracker::writeToDisk( const string& address , const bool& withLa
                 string score = std::to_string(bbox_[frame_index][Bindex].score);
                 string label_name = label_to_name_[ bbox_[frame_index][Bindex].label];
                 
-                cv::rectangle( frameClone , rect , cv::Scalar(255,0,0) , 2 );
+                if ( (frame_count - start_frame_ )%detection_gap_ != 0 )
+                    cv::rectangle( frame_ , rect , cv::Scalar(255,0,0) , 2 );
+                else
+                    cv::rectangle( frame_ , rect , cv::Scalar(0,0,255) , 2 );
+                // if this frame is detection frame, then decorate it with different color
+                // and longer duration.
+                
                 if ( withLabel )
                 {
                     string show_message = label_name;
-                    cv::putText( frameClone , show_message , cvPoint( rect.x , rect.y ) ,
+                    cv::putText( frame_ , show_message , cvPoint( rect.x , rect.y ) ,
                                 cv::FONT_HERSHEY_SIMPLEX , 0.5, cvScalar(0,255,0) , 1 , 8 );
                 }
                 if ( withScore )
                 {
                     string show_message = string("    ") + score ;
-                    cv::putText( frameClone , show_message , cvPoint( rect.x , rect.y ) ,
+                    cv::putText( frame_ , show_message , cvPoint( rect.x , rect.y ) ,
                                 cv::FONT_HERSHEY_SIMPLEX , 0.5, cvScalar(0,255,0) , 1 , 8 );
                 }
             }
         }// if frame in the range of tracking frame
         // we need to add the annotation boxes into the frame
         
-        cv::imshow( "test" , frameClone );
-        cv::waitKey(50);
-        writer << frameClone;
+//        cv::imshow( "test" , frame_ );
+//        cv::waitKey(50);
+        writer << frame_;
+        if ( (frame_count - start_frame_ )%detection_gap_ == 0 )
+            for( int icolor = 0 ; icolor < 10 ; icolor ++ )
+                writer << frame_;
         // write every frame into the new created video file but with added bboxes.
         
         frame_count ++;

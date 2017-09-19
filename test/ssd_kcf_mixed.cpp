@@ -22,16 +22,10 @@ int main()
     
     Detector_N_Tracker DNTracker( model_file , weight_file, label_file , mean_value );
     
-    CHECK( DNTracker.init( video_file , 10 , 0.3 ));
-    
-    DNTracker.detectFrom( 0 );
-    
-//    cout << "shit not happen " << endl;
+    DNTracker.init( video_file , 10 , 0.3 , .5 );
+    DNTracker.detect();
     DNTracker.writeToDisk( "/Users/pitaloveu/Desktop/test.avi");
     
-
-      
-
-  return 1;
+    return 1;
 }
 
