@@ -10,18 +10,17 @@
 #include <utility>
 #include <vector>
 
-#include "ssd_detect.hpp"
+#include "deepMAR.hpp"
 
 using namespace caffe;  // NOLINT(build/namespaces)
 
 DEFINE_string(mean_file, "",
-    "The mean file used to subtract from the input image.");
+     "The mean file used to subtract from the input image.");
 DEFINE_string(mean_value, "104,117,123",
     "If specified, can be one value or can be same as image channels"
-    " - would subtract from the corresponding channel). Separated by ','."
-    "Either mean_file or mean_value should be provided, not both.");
-DEFINE_double(confidence_threshold, 0.5,
-    "Only store detections with score higher than the threshold.");
+     " - would subtract from the corresponding channel). Separated by ','."
+     "Either mean_file or mean_value should be provided, not both.");
+
 
 int main(int argc, char** argv) {
   ::google::InitGoogleLogging(argv[0]);
@@ -44,12 +43,11 @@ int main(int argc, char** argv) {
 
   const string& model_file = argv[1];
   const string& weights_file = argv[2];
-  const string& mean_file = FLAGS_mean_file;
-  const string& mean_value = FLAGS_mean_value;
-  const float confidence_threshold = FLAGS_confidence_threshold;
+	const string& mean_file = FLAGS_mean_file;
+	const string& mean_value = FLAGS_mean_value;
 
   // Initialize the network.
-  Detector detector(model_file, weights_file, mean_file, mean_value);
+  MultiLabelClassifier classifier(model_file, weights_file , mean_file , mean_value ,0.3);
 
   // Set the output mode.
   std::streambuf* buf = std::cout.rdbuf();
@@ -60,9 +58,12 @@ int main(int argc, char** argv) {
 	cv::Mat imgClone = img;
 
 	CHECK(!img.empty()) << "Unable to decode image " << file;
-	std::vector<vector<float> > detections = detector.Detect(img);
 
-	/* Print the detection results. */
+	std::vector<int> results = classifier.Analyze( img );
+
+	for ( int i = 0 ; i < results.size() ; i ++ )
+		std::cout << results[i] << " ";
+/*
 	for (int i = 0; i < detections.size(); ++i) {
 		const vector<float>& d = detections[i];
 		// Detection format: [image_id, label, score, xmin, ymin, xmax, ymax].
@@ -88,5 +89,6 @@ int main(int argc, char** argv) {
 	}
 	cv::imshow( "bbox show" , img );
 	cv::waitKey(0);
+*/
 	return 0;
 }

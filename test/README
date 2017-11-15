@@ -1,0 +1,4 @@
+test_accuracy.cpp is built for testing the Multi_label accuray layer,
+
+found that the inputlayer has been mistakenly used, without Scaling and subtracting mean value
+

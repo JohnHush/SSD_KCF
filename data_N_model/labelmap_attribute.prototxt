@@ -1,0 +1,130 @@
+item{
+	name: "Female"
+	label: 1
+	display_name:""
+}
+item{
+	name: "AgeOver60"
+	label: 2
+	display_name:""
+}
+item{
+	name: "Age18-60"
+	label: 3
+	display_name:""
+}
+item{
+	name: "AgeLess18"
+	label: 4
+	display_name:""
+}
+item{
+	name: "Front"
+	label: 5
+	display_name:""
+}
+item{
+	name: "Side"
+	label: 6
+	display_name:""
+}
+item{
+	name: "Back"
+	label: 7
+	display_name:""
+}
+item{
+	name: "Hot"
+	label: 8
+	display_name:""
+}
+item{
+	name: "Glasses"
+	label: 9
+	display_name:""
+}
+item{
+	name: "HandBag"
+	label: 10
+	display_name:""
+}
+item{
+	name: "ShoulderBag"
+	label: 11
+	display_name:""
+}
+item{
+	name: "Backpack"
+	label: 12
+	display_name:""
+}
+item{
+	name: "HoldObjectsInFront"
+	label: 13
+	display_name:""
+}
+item{
+	name: "ShortSleeve"
+	label: 14
+	display_name:""
+}
+item{
+	name: "LongSleeve"
+	label: 15
+	display_name:""
+}
+item{
+	name: "UpperStride"
+	label: 16
+	display_name:""
+}
+item{
+	name: "UpperLogo"
+	label: 17
+	display_name:""
+}
+item{
+	name: "UpperPlaid"
+	label: 18
+	display_name:""
+}
+item{
+	name: "UpperSplice"
+	label: 19
+	display_name:""
+}
+item{
+	name: "LowerStripe"
+	label: 20
+	display_name:""
+}
+item{
+	name: "LowerPattern"
+	label: 21
+	display_name:""
+}
+item{
+	name: "LongCoat"
+	label: 22
+	display_name:""
+}
+item{
+	name: "Trousers"
+	label: 23
+	display_name:""
+}
+item{
+	name: "Shorts"
+	label: 24
+	display_name:""
+}
+item{
+	name: "Skirt&Dress"
+	label: 25
+	display_name:""
+}
+item{
+	name: "boots"
+	label: 26
+	display_name:""
+}

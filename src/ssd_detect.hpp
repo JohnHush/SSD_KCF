@@ -21,7 +21,8 @@ class Detector {
   Detector(const string& model_file,
            const string& weights_file,
            const string& mean_file,
-           const string& mean_value);
+           const string& mean_value,
+					 caffe::Caffe::Brew mode = caffe::Caffe::CPU );
 
   std::vector<vector<float> > Detect(const cv::Mat& img);
 

@@ -1,12 +1,14 @@
 
-#include "ssd_detect.hpp"
+#include "deepMAR.hpp"
 
-Detector::Detector(const string& model_file,
-                   const string& weights_file,
-                   const string& mean_file,
-                   const string& mean_value, 
-									 caffe::Caffe::Brew mode ) {
-  Caffe::set_mode(mode);
+MultiLabelClassifier::MultiLabelClassifier(	const string& model_file,
+													                  const string& weights_file,
+																						const string& mean_file,
+																						const string& mean_value,
+	 																					const float& scale_factor,
+																						caffe::Caffe::Brew mode	)
+{
+  Caffe::set_mode( mode );
 
   /* Load the network. */
   net_.reset(new Net<float>(model_file, TEST));
@@ -21,11 +23,12 @@ Detector::Detector(const string& model_file,
     << "Input layer should have 1 or 3 channels.";
   input_geometry_ = cv::Size(input_layer->width(), input_layer->height());
 
-  /* Load the binaryproto mean file. */
-  SetMean(mean_file, mean_value);
+	SetMean(mean_file, mean_value);
+	scale_factor_ = scale_factor;
 }
 
-std::vector<vector<float> > Detector::Detect(const cv::Mat& img) {
+std::vector<int> MultiLabelClassifier::Analyze(const cv::Mat& img)
+{
   Blob<float>* input_layer = net_->input_blobs()[0];
   input_layer->Reshape(1, num_channels_,
                        input_geometry_.height, input_geometry_.width);
@@ -36,29 +39,22 @@ std::vector<vector<float> > Detector::Detect(const cv::Mat& img) {
   WrapInputLayer(&input_channels);
 
   Preprocess(img, &input_channels);
-
   net_->Forward();
 
   /* Copy the output layer to a std::vector */
   Blob<float>* result_blob = net_->output_blobs()[0];
   const float* result = result_blob->cpu_data();
-  const int num_det = result_blob->height();
-  vector<vector<float> > detections;
-  for (int k = 0; k < num_det; ++k) {
-    if (result[0] == -1) {
-      // Skip invalid detection.
-      result += 7;
-      continue;
-    }
-    vector<float> detection(result, result + 7);
-    detections.push_back(detection);
-    result += 7;
-  }
-  return detections;
+	const int num_att = result_blob->count();
+	vector<int> att_vec;
+
+	for ( int k = 0 ; k < num_att ; ++k )
+		att_vec.push_back( static_cast<int>( result[k]>0.5 ) );
+
+	return att_vec;
 }
 
 /* Load the mean file in binaryproto format. */
-void Detector::SetMean(const string& mean_file, const string& mean_value) {
+void MultiLabelClassifier::SetMean(const string& mean_file, const string& mean_value) {
   cv::Scalar channel_mean;
   if (!mean_file.empty()) {
     CHECK(mean_value.empty()) <<
@@ -120,12 +116,13 @@ void Detector::SetMean(const string& mean_file, const string& mean_value) {
  * don't need to rely on cudaMemcpy2D. The last preprocessing
  * operation will write the separate channels directly to the input
  * layer. */
-void Detector::WrapInputLayer(std::vector<cv::Mat>* input_channels) {
+void MultiLabelClassifier::WrapInputLayer(std::vector<cv::Mat>* input_channels) {
   Blob<float>* input_layer = net_->input_blobs()[0];
 
   int width = input_layer->width();
   int height = input_layer->height();
   float* input_data = input_layer->mutable_cpu_data();
+
   for (int i = 0; i < input_layer->channels(); ++i) {
     cv::Mat channel(height, width, CV_32FC1, input_data);
     input_channels->push_back(channel);
@@ -133,7 +130,7 @@ void Detector::WrapInputLayer(std::vector<cv::Mat>* input_channels) {
   }
 }
 
-void Detector::Preprocess(const cv::Mat& img,
+void MultiLabelClassifier::Preprocess(const cv::Mat& img,
                             std::vector<cv::Mat>* input_channels) {
   /* Convert the input image to the input image format of the network. */
   cv::Mat sample;
@@ -163,10 +160,16 @@ void Detector::Preprocess(const cv::Mat& img,
   cv::Mat sample_normalized;
   cv::subtract(sample_float, mean_, sample_normalized);
 
+	cv::Mat sample_scaled;
+  if (num_channels_ == 3)
+		sample_normalized.convertTo( sample_scaled , CV_32FC3 , scale_factor_ );
+	else
+		sample_normalized.convertTo( sample_scaled , CV_32FC1 , scale_factor_ );
+
   /* This operation will write the separate BGR planes directly to the
    * input layer of the network because it is wrapped by the cv::Mat
    * objects in input_channels. */
-  cv::split(sample_normalized, *input_channels);
+  cv::split(sample_scaled	, *input_channels);
 
   CHECK(reinterpret_cast<float*>(input_channels->at(0).data)
         == net_->input_blobs()[0]->cpu_data())
