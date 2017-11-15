@@ -1,5 +1,4 @@
 #include <opencv2/core/utility.hpp>
-#include <opencv2/tracking.hpp>
 #include <opencv2/videoio.hpp>
 #include <opencv2/highgui.hpp>
 #include <iostream>
@@ -19,6 +18,8 @@ using std::string;
 using std::cout;
 using std::endl;
 
+
+DEFINE_int32( skip , 10 , "skip frame of the input video" );
 DEFINE_string(mean_file, "",
 		"The mean file used to subtract from the input image.");
 DEFINE_string(mean_value, "104,117,123",
@@ -63,6 +64,7 @@ int main(int argc, char** argv) {
 	const string& mean_value = FLAGS_mean_value;
 	const float confidence_threshold = FLAGS_confidence_threshold;
 	const float scale = FLAGS_scale;
+	const int skip = FLAGS_skip;
 
 	const string& video_file = argv[7];
 
@@ -87,22 +89,26 @@ int main(int argc, char** argv) {
 	ReadProtoFromTextFile( mar_label , &mar_label_map  );
 	CHECK( MapLabelToName( mar_label_map , true, &mar_label_name ) ) << "Duplicate labels";
 
-	Detector detector( ssd_model , ssd_weight , mean_file, mean_value );
-	MultiLabelClassifier classifier( mar_model , mar_weight ,	mean_file , mean_value , scale );
+	Detector detector( ssd_model , ssd_weight , mean_file, mean_value ,caffe::Caffe::GPU );
+	MultiLabelClassifier classifier( mar_model , mar_weight ,	mean_file , mean_value , scale , caffe::Caffe::GPU );
 
 	int video_width = cap.get( CV_CAP_PROP_FRAME_WIDTH );
 	int video_heigh = cap.get( CV_CAP_PROP_FRAME_HEIGHT);
 
 	cv::VideoWriter writer( "./default.avi" , CV_FOURCC('D','I','V','X') , 5 , cv::Size( video_width , video_heigh ) , true );
 
-	int skip = 100;
 	while( cap.read(img) )
 	{
+		bool ifend = false;
 		for( int i = 0 ;i < skip ; ++i )
 		{
 			if ( !cap.read(img) )
+			{
+				ifend = true;
 				break;
+			}
 		}
+		if( ifend ) break;
 
 		Mat imgClone;
 		img.copyTo( imgClone );
@@ -131,6 +137,9 @@ int main(int argc, char** argv) {
 				Dbb = std::min( img.rows -1 , Dbb );
 
 				cv::Rect rect( Lbb , Ubb , Rbb-Lbb , Dbb - Ubb );
+
+				if ( rect.width<=0 || rect.height <= 0 )
+					continue;
 
 				string label = ssd_label_name[static_cast<int>(d[1])];
 				string score = std::to_string( d[2] );
@@ -177,9 +186,9 @@ int main(int argc, char** argv) {
 		}
 		writer << imgClone;
 
-		cv::namedWindow( "bbox show" );
-		cv::imshow( "bbox show" , imgClone );
-		cv::waitKey(33);
+//		cv::namedWindow( "bbox show" );
+//		cv::imshow( "bbox show" , imgClone );
+//		cv::waitKey(33);
 	}
 	return 0;
 }
