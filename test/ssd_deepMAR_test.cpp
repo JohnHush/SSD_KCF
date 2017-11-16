@@ -103,25 +103,24 @@ int main(int argc, char** argv) {
 	cap.set( CV_CAP_PROP_POS_FRAMES , 0 );
 	int POS = 0;
 
+	caffe::Timer timer;
+	double ssd_time =0.;
+	double mar_time =0.;
+	int time_count =0;
+	int mar_time_count =0;
+
 	while( cap.read(img) )
 	{
+		time_count ++;
 		POS += skip;
 		cap.set( CV_CAP_PROP_POS_FRAMES , POS );
-/*		bool ifend = false;
-		for( int i = 0 ;i < skip ; ++i )
-		{
-			if ( !cap.read(img) )
-			{
-				ifend = true;
-				break;
-			}
-		}
-		if( ifend ) break;
-*/
+
 		Mat imgClone;
 		img.copyTo( imgClone );
 
+		timer.Start();
 		std::vector<vector<float> > detections = detector.Detect(img);
+		ssd_time += timer.MilliSeconds();
 
 		for (int i = 0; i < detections.size(); ++i)
 		{
@@ -172,7 +171,10 @@ int main(int argc, char** argv) {
 				{
 					Mat img_deepMAR( img , rect );
 
+					mar_time_count ++;
+					timer.Start();
 					std::vector<int> results = classifier.Analyze( img_deepMAR );
+					mar_time += timer.MilliSeconds();
 
 					int x_cor = rect.x;
 					int y_cor = rect.y + 20;
@@ -211,6 +213,9 @@ int main(int argc, char** argv) {
 //		cv::imshow( "bbox show" , imgClone );
 //		cv::waitKey(33);
 	}
+	LOG(INFO) << "ssd time = " << ssd_time/time_count << std::endl;
+	LOG(INFO) << "mar time = " << mar_time/mar_time_count << std::endl;
+
 	return 0;
 }
 
