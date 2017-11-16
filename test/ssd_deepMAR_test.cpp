@@ -19,6 +19,7 @@ using std::cout;
 using std::endl;
 
 
+DEFINE_bool( USE_GPU , true , "use GPU or not " );
 DEFINE_int32( skip , 10 , "skip frame of the input video" );
 DEFINE_string(mean_file, "",
 		"The mean file used to subtract from the input image.");
@@ -65,6 +66,8 @@ int main(int argc, char** argv) {
 	const float confidence_threshold = FLAGS_confidence_threshold;
 	const float scale = FLAGS_scale;
 	const int skip = FLAGS_skip;
+	const bool USE_GPU = FLAGS_USE_GPU;
+	caffe::Caffe::Brew mode = USE_GPU ? caffe::Caffe::GPU : caffe::Caffe::CPU;
 
 	const string& video_file = argv[7];
 
@@ -89,17 +92,22 @@ int main(int argc, char** argv) {
 	ReadProtoFromTextFile( mar_label , &mar_label_map  );
 	CHECK( MapLabelToName( mar_label_map , true, &mar_label_name ) ) << "Duplicate labels";
 
-	Detector detector( ssd_model , ssd_weight , mean_file, mean_value ,caffe::Caffe::GPU );
-	MultiLabelClassifier classifier( mar_model , mar_weight ,	mean_file , mean_value , scale , caffe::Caffe::GPU );
+	Detector detector( ssd_model , ssd_weight , mean_file, mean_value , mode);
+	MultiLabelClassifier classifier( mar_model , mar_weight ,	mean_file , mean_value , scale , mode );
 
 	int video_width = cap.get( CV_CAP_PROP_FRAME_WIDTH );
 	int video_heigh = cap.get( CV_CAP_PROP_FRAME_HEIGHT);
 
 	cv::VideoWriter writer( "./default.avi" , CV_FOURCC('D','I','V','X') , 5 , cv::Size( video_width , video_heigh ) , true );
+	int totalFrame = cap.get( CV_CAP_PROP_FRAME_COUNT );
+	cap.set( CV_CAP_PROP_POS_FRAMES , 0 );
+	int POS = 0;
 
 	while( cap.read(img) )
 	{
-		bool ifend = false;
+		POS += skip;
+		cap.set( CV_CAP_PROP_POS_FRAMES , POS );
+/*		bool ifend = false;
 		for( int i = 0 ;i < skip ; ++i )
 		{
 			if ( !cap.read(img) )
@@ -109,7 +117,7 @@ int main(int argc, char** argv) {
 			}
 		}
 		if( ifend ) break;
-
+*/
 		Mat imgClone;
 		img.copyTo( imgClone );
 
@@ -167,18 +175,31 @@ int main(int argc, char** argv) {
 					std::vector<int> results = classifier.Analyze( img_deepMAR );
 
 					int x_cor = rect.x;
-					int y_cor = rect.y + 10;
+					int y_cor = rect.y + 20;
 
 					for ( int iattribute = 0 ; iattribute < results.size() ; ++ iattribute )
 					{
 						if ( results[iattribute] != 0 || iattribute == 0 )
 						{
-							y_cor += 20;
+							y_cor += 30;
 
 							string attribute = mar_label_name[ iattribute+1 ];
 							if ( results[0] == 0 && iattribute == 0 )
 								attribute = string("Male");
-							cv::putText( imgClone , attribute , cvPoint( x_cor , y_cor ) , cv::FONT_HERSHEY_SIMPLEX , 0.5, cvScalar(255,0,0) , 1 , 8 );
+
+							cv::Rect rect_tmp( x_cor , y_cor-15 , 100 , 20 );
+							if( x_cor < 0 || y_cor-15 < 0 || 
+									x_cor+100 >= imgClone.size().width || y_cor-15 +20>=imgClone.size().height)
+								continue;
+							cv::Mat imgCloneROI = imgClone( rect_tmp );
+
+							for( int irow =0 ; irow < imgCloneROI.rows ; ++ irow )
+							for( int icol =0 ; icol < 3*imgCloneROI.cols ; ++ icol )
+								imgCloneROI.at<uchar>(irow,icol) = uchar(imgCloneROI.at<uchar>(irow,icol )/3 + 32 );
+						//		imgCloneROI.at<uchar>(irow,icol) = 68;
+
+//							cv::rectangle( imgClone , rect_tmp , cv::Scalar( 68 , 68 , 68 ) , -1 );
+							cv::putText( imgClone , attribute , cvPoint( x_cor , y_cor ) , cv::FONT_HERSHEY_SIMPLEX , 0.5, cvScalar(255,255,255) , 1 , 8 );
 						}
 					}
 				}
