@@ -59,7 +59,11 @@ int main(int argc, char** argv) {
 
 	CHECK(!img.empty()) << "Unable to decode image " << file;
 
-	std::vector<int> results = classifier.Analyze( img );
+	std::vector<cv::Mat> imgVec;
+	imgVec.push_back( img );
+
+	std::vector<std::vector<int> > results_Vec = classifier.Analyze( imgVec );
+	std::vector<int> results = results_Vec[0];
 
 	for ( int i = 0 ; i < results.size() ; i ++ )
 		std::cout << results[i] << " ";

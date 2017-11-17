@@ -176,15 +176,14 @@ void MultiLabelClassifier::Preprocess(const std::vector<cv::Mat>& imgVec,
 		else
 			sample_normalized.convertTo( sample_scaled , CV_32FC1 , scale_factor_ );
 
-		std::vector<cv::Mat> img_split;
+		std::vector<cv::Mat> img_split(0);
+		for ( int iC = 0 ; iC < num_channels_ ; ++iC )
+			img_split.push_back( (*input_channels)[iC + iBatch * num_channels_ ] );
 		/* This operation will write the separate BGR planes directly to the
 		 * input layer of the network because it is wrapped by the cv::Mat
 		 * objects in input_channels. */
 		cv::split(sample_scaled	, img_split );
-		//cv::split(sample_scaled	, *input_channels);
 
-		for ( int iC = 0 ; iC < num_channels_ ; ++iC )
-			(*input_channels)[iC + iBatch * num_channels_ ] = img_split[iC];
 	}
 	CHECK(reinterpret_cast<float*>(input_channels->at(0).data)
 			== net_->input_blobs()[0]->cpu_data())
