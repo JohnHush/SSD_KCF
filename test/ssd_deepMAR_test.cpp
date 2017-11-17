@@ -125,7 +125,7 @@ int main(int argc, char** argv) {
 			if ( detections[iBBOX][2] >= confidence_threshold )
 			{
 				passD.push_back( detections[iBBOX] );
-				if ( ssd_label_name[static_cast<int>(d[1])] == "1" )
+				if ( ssd_label_name[static_cast<int>(detections[iBBOX][1])] == "1" )
 					personD.push_back( detections[iBBOX] );
 				else
 					othersD.push_back( detections[iBBOX] );
@@ -137,7 +137,6 @@ int main(int argc, char** argv) {
 			const vector<float>& d = othersD[i];
 			// Detection format: [image_id, label, score, xmin, ymin, xmax, ymax].
 			CHECK_EQ(d.size(), 7);
-			const float score = d[2];
 
 			int Lbb = d[3] * img.cols;
 			int Ubb = d[4] * img.rows;
@@ -173,7 +172,6 @@ int main(int argc, char** argv) {
 			const vector<float>& d = personD[i];
 			// Detection format: [image_id, label, score, xmin, ymin, xmax, ymax].
 			CHECK_EQ(d.size(), 7);
-			const float score = d[2];
 
 			int Lbb = d[3] * img.cols;
 			int Ubb = d[4] * img.rows;
