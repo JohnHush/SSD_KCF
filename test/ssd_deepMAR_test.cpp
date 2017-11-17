@@ -18,7 +18,6 @@ using std::string;
 using std::cout;
 using std::endl;
 
-
 DEFINE_bool( USE_GPU , true , "use GPU or not " );
 DEFINE_int32( skip , 10 , "skip frame of the input video" );
 DEFINE_string(mean_file, "",
@@ -31,7 +30,6 @@ DEFINE_double(confidence_threshold, 0.5,
 		"Only store detections with score higher than the threshold.");
 DEFINE_double(scale ,  0.00390625,
 		"the scale factor when doing scale of the image");
-
 
 int main(int argc, char** argv) {
 	::google::InitGoogleLogging(argv[0]);
@@ -78,10 +76,6 @@ int main(int argc, char** argv) {
 
 	Mat img;
 
-//	cap.set( CV_CAP_PROP_POS_FRAMES,3400);
-
-//	cap >> img;
-
 	map<int , string> ssd_label_name;
 	LabelMap ssd_label_map;
 	ReadProtoFromTextFile( ssd_label , &ssd_label_map );
@@ -122,101 +116,136 @@ int main(int argc, char** argv) {
 		std::vector<vector<float> > detections = detector.Detect(img);
 		ssd_time += timer.MilliSeconds();
 
-		for (int i = 0; i < detections.size(); ++i)
+		std::vector<vector<float> > passD(0);
+		std::vector<vector<float> > personD(0);
+		std::vector<vector<float> > othersD(0);
+
+		for( int iBBOX = 0 ; iBBOX < detections.size() ; ++ iBBOX )
 		{
-			const vector<float>& d = detections[i];
+			if ( detections[iBBOX][2] >= confidence_threshold )
+			{
+				passD.push_back( detections[iBBOX] );
+				if ( ssd_label_name[static_cast<int>(d[1])] == "1" )
+					personD.push_back( detections[iBBOX] );
+				else
+					othersD.push_back( detections[iBBOX] );
+			}
+		}
+
+		for ( int i = 0 ; i < othersD.size() ; ++i )
+		{
+			const vector<float>& d = othersD[i];
 			// Detection format: [image_id, label, score, xmin, ymin, xmax, ymax].
 			CHECK_EQ(d.size(), 7);
 			const float score = d[2];
-			if (score >= confidence_threshold)
+
+			int Lbb = d[3] * img.cols;
+			int Ubb = d[4] * img.rows;
+			int Rbb = d[5] * img.cols;
+			int Dbb = d[6] * img.rows;
+
+			if ( Lbb >= img.cols || Rbb < 0 || Ubb >= img.rows || Dbb < 0 )
+				continue;
+
+			Lbb = std::max( 0 , Lbb );
+			Ubb = std::max( 0 , Ubb );
+			Rbb = std::min( img.cols -1 , Rbb );
+			Dbb = std::min( img.rows -1 , Dbb );
+
+			cv::Rect rect( Lbb , Ubb , Rbb-Lbb , Dbb - Ubb );
+
+			if ( rect.width<=0 || rect.height <= 0 )
+				continue;
+
+			string label = ssd_label_name[static_cast<int>(d[1])];
+			string score = std::to_string( d[2] );
+
+			string show1 = label;
+			string show2 = std::string( "            " ) + score;
+
+			cv::rectangle( imgClone , rect , cv::Scalar( 0 , 255 , 0 ) , 2 );
+			cv::putText( imgClone , show1 , cvPoint( rect.x , rect.y ) , cv::FONT_HERSHEY_SIMPLEX , 0.5, cvScalar(0,255,0) , 1 , 8 );
+			cv::putText( imgClone , show2 , cvPoint( rect.x , rect.y ) , cv::FONT_HERSHEY_SIMPLEX , 0.5, cvScalar(0,255,0) , 1 , 8 );
+		}
+
+		for (int i = 0; i < personD.size(); ++i)
+		{
+			const vector<float>& d = personD[i];
+			// Detection format: [image_id, label, score, xmin, ymin, xmax, ymax].
+			CHECK_EQ(d.size(), 7);
+			const float score = d[2];
+
+			int Lbb = d[3] * img.cols;
+			int Ubb = d[4] * img.rows;
+			int Rbb = d[5] * img.cols;
+			int Dbb = d[6] * img.rows;
+
+			if ( Lbb >= img.cols || Rbb < 0 || Ubb >= img.rows || Dbb < 0 )
+				continue;
+
+			Lbb = std::max( 0 , Lbb );
+			Ubb = std::max( 0 , Ubb );
+			Rbb = std::min( img.cols -1 , Rbb );
+			Dbb = std::min( img.rows -1 , Dbb );
+
+			cv::Rect rect( Lbb , Ubb , Rbb-Lbb , Dbb - Ubb );
+
+			if ( rect.width<=0 || rect.height <= 0 )
+				continue;
+
+			string label = ssd_label_name[static_cast<int>(d[1])];
+			string score = std::to_string( d[2] );
+
+			string show1 = label;
+			string show2 = std::string( "            " ) + score;
+
+			cv::rectangle( imgClone , rect , cv::Scalar( 0 , 0 , 255 ) , 2 );
+			cv::putText( imgClone , score , cvPoint( rect.x , rect.y ) , cv::FONT_HERSHEY_SIMPLEX , 0.5, cvScalar(0,0,255) , 1 , 8 );
+
+			Mat img_deepMAR( img , rect );
+
+			std::vector<cv::Mat> img_deepMAR_Vec(1);
+			img_deepMAR_Vec[0] = img_deepMAR;
+
+			mar_time_count ++;
+			timer.Start();
+			std::vector<std::vector<int> > results_VEC = classifier.Analyze( img_deepMAR_Vec );
+			mar_time += timer.MilliSeconds();
+
+			std::vector<int> results = results_VEC[0];
+
+			int x_cor = rect.x;
+			int y_cor = rect.y + 20;
+
+			for ( int iattribute = 0 ; iattribute < results.size() ; ++ iattribute )
 			{
-				int Lbb = d[3] * img.cols;
-				int Ubb = d[4] * img.rows;
-				int Rbb = d[5] * img.cols;
-				int Dbb = d[6] * img.rows;
-
-				if ( Lbb >= img.cols || Rbb < 0 || Ubb >= img.rows || Dbb < 0 )
-					continue;
-
-				Lbb = std::max( 0 , Lbb );
-				Ubb = std::max( 0 , Ubb );
-				Rbb = std::min( img.cols -1 , Rbb );
-				Dbb = std::min( img.rows -1 , Dbb );
-
-				cv::Rect rect( Lbb , Ubb , Rbb-Lbb , Dbb - Ubb );
-
-				if ( rect.width<=0 || rect.height <= 0 )
-					continue;
-
-				string label = ssd_label_name[static_cast<int>(d[1])];
-				string score = std::to_string( d[2] );
-
-				string show1 = label;
-				string show2 = std::string( "            " ) + score;
-
-				if ( label == "1" ) 
+				if ( results[iattribute] != 0 || iattribute == 0 )
 				{
-					cv::rectangle( imgClone , rect , cv::Scalar( 0 , 0 , 255 ) , 2 );
-					cv::putText( imgClone , score , cvPoint( rect.x , rect.y ) , cv::FONT_HERSHEY_SIMPLEX , 0.5, cvScalar(0,0,255) , 1 , 8 );
-				}
+					y_cor += 30;
 
-				else
-				{	
-					cv::rectangle( imgClone , rect , cv::Scalar( 0 , 255 , 0 ) , 2 );
-					cv::putText( imgClone , show1 , cvPoint( rect.x , rect.y ) , cv::FONT_HERSHEY_SIMPLEX , 0.5, cvScalar(0,255,0) , 1 , 8 );
-					cv::putText( imgClone , show2 , cvPoint( rect.x , rect.y ) , cv::FONT_HERSHEY_SIMPLEX , 0.5, cvScalar(0,255,0) , 1 , 8 );
-				}
+					string attribute = mar_label_name[ iattribute+1 ];
+					if ( results[0] == 0 && iattribute == 0 )
+						attribute = string("Male");
 
-				if ( label == "1" )
-				{
-					Mat img_deepMAR( img , rect );
+					cv::Rect rect_tmp( x_cor , y_cor-15 , 100 , 20 );
+					if( x_cor < 0 || y_cor-15 < 0 || 
+							x_cor+100 >= imgClone.size().width || y_cor-15 +20>=imgClone.size().height)
+						continue;
+					cv::Mat imgCloneROI = imgClone( rect_tmp );
 
-					std::vector<cv::Mat> img_deepMAR_Vec(1);
-					img_deepMAR_Vec[0] = img_deepMAR;
+					for( int irow =0 ; irow < imgCloneROI.rows ; ++ irow )
+						for( int icol =0 ; icol < 3*imgCloneROI.cols ; ++ icol )
+							imgCloneROI.at<uchar>(irow,icol) = uchar(imgCloneROI.at<uchar>(irow,icol )/3 + 32 );
 
-					mar_time_count ++;
-					timer.Start();
-					std::vector<std::vector<int> > results_VEC = classifier.Analyze( img_deepMAR_Vec );
-					mar_time += timer.MilliSeconds();
-
-					std::vector<int> results = results_VEC[0];
-
-					int x_cor = rect.x;
-					int y_cor = rect.y + 20;
-
-					for ( int iattribute = 0 ; iattribute < results.size() ; ++ iattribute )
-					{
-						if ( results[iattribute] != 0 || iattribute == 0 )
-						{
-							y_cor += 30;
-
-							string attribute = mar_label_name[ iattribute+1 ];
-							if ( results[0] == 0 && iattribute == 0 )
-								attribute = string("Male");
-
-							cv::Rect rect_tmp( x_cor , y_cor-15 , 100 , 20 );
-							if( x_cor < 0 || y_cor-15 < 0 || 
-									x_cor+100 >= imgClone.size().width || y_cor-15 +20>=imgClone.size().height)
-								continue;
-							cv::Mat imgCloneROI = imgClone( rect_tmp );
-
-							for( int irow =0 ; irow < imgCloneROI.rows ; ++ irow )
-							for( int icol =0 ; icol < 3*imgCloneROI.cols ; ++ icol )
-								imgCloneROI.at<uchar>(irow,icol) = uchar(imgCloneROI.at<uchar>(irow,icol )/3 + 32 );
-						//		imgCloneROI.at<uchar>(irow,icol) = 68;
-
-//							cv::rectangle( imgClone , rect_tmp , cv::Scalar( 68 , 68 , 68 ) , -1 );
-							cv::putText( imgClone , attribute , cvPoint( x_cor , y_cor ) , cv::FONT_HERSHEY_SIMPLEX , 0.5, cvScalar(255,255,255) , 1 , 8 );
-						}
-					}
+					cv::putText( imgClone , attribute , cvPoint( x_cor , y_cor ) , cv::FONT_HERSHEY_SIMPLEX , 0.5, cvScalar(255,255,255) , 1 , 8 );
 				}
 			}
 		}
 		writer << imgClone;
 
-//		cv::namedWindow( "bbox show" );
-//		cv::imshow( "bbox show" , imgClone );
-//		cv::waitKey(33);
+		//		cv::namedWindow( "bbox show" );
+		//		cv::imshow( "bbox show" , imgClone );
+		//		cv::waitKey(33);
 	}
 	LOG(INFO) << "ssd time = " << ssd_time/time_count << std::endl;
 	LOG(INFO) << "mar time = " << mar_time/mar_time_count << std::endl;
