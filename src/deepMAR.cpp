@@ -27,10 +27,11 @@ MultiLabelClassifier::MultiLabelClassifier(	const string& model_file,
 	scale_factor_ = scale_factor;
 }
 
-std::vector<int> MultiLabelClassifier::Analyze(const cv::Mat& img)
+std::vector<std::vector<int> > MultiLabelClassifier::Analyze( const std::vector<cv::Mat>& imgVec )
 {
+	num_batch_ = imgVec.size();
   Blob<float>* input_layer = net_->input_blobs()[0];
-  input_layer->Reshape(1, num_channels_,
+  input_layer->Reshape( num_batch_ , num_channels_,
                        input_geometry_.height, input_geometry_.width);
   /* Forward dimension change to all layers. */
   net_->Reshape();
@@ -38,17 +39,24 @@ std::vector<int> MultiLabelClassifier::Analyze(const cv::Mat& img)
   std::vector<cv::Mat> input_channels;
   WrapInputLayer(&input_channels);
 
-  Preprocess(img, &input_channels);
+  Preprocess(imgVec, &input_channels);
   net_->Forward();
 
   /* Copy the output layer to a std::vector */
   Blob<float>* result_blob = net_->output_blobs()[0];
   const float* result = result_blob->cpu_data();
-	const int num_att = result_blob->count();
-	vector<int> att_vec;
+	const int num_att = result_blob->count() / num_batch_;
+	std::vector<std::vector<int> > att_vec(0);
 
-	for ( int k = 0 ; k < num_att ; ++k )
-		att_vec.push_back( static_cast<int>( result[k]>0.5 ) );
+	for( int iBatch = 0 ; iBatch < num_batch_ ; ++ iBatch )
+	{
+		std::vector<int> att_tmp(0);
+		for ( int k = 0 ; k < num_att ; ++k )
+			att_tmp.push_back( static_cast<int>( result[k]>0.5 ) );
+
+		att_vec.push_back( att_tmp );
+		result += num_att;
+	}
 
 	return att_vec;
 }
@@ -123,56 +131,63 @@ void MultiLabelClassifier::WrapInputLayer(std::vector<cv::Mat>* input_channels) 
   int height = input_layer->height();
   float* input_data = input_layer->mutable_cpu_data();
 
+	for( int iBatch = 0 ; iBatch < num_batch_ ; ++iBatch )
   for (int i = 0; i < input_layer->channels(); ++i) {
     cv::Mat channel(height, width, CV_32FC1, input_data);
     input_channels->push_back(channel);
     input_data += width * height;
-  }
+	}
 }
 
-void MultiLabelClassifier::Preprocess(const cv::Mat& img,
-                            std::vector<cv::Mat>* input_channels) {
-  /* Convert the input image to the input image format of the network. */
-  cv::Mat sample;
-  if (img.channels() == 3 && num_channels_ == 1)
-    cv::cvtColor(img, sample, cv::COLOR_BGR2GRAY);
-  else if (img.channels() == 4 && num_channels_ == 1)
-    cv::cvtColor(img, sample, cv::COLOR_BGRA2GRAY);
-  else if (img.channels() == 4 && num_channels_ == 3)
-    cv::cvtColor(img, sample, cv::COLOR_BGRA2BGR);
-  else if (img.channels() == 1 && num_channels_ == 3)
-    cv::cvtColor(img, sample, cv::COLOR_GRAY2BGR);
-  else
-    sample = img;
+void MultiLabelClassifier::Preprocess(const std::vector<cv::Mat>& imgVec,
+		std::vector<cv::Mat>* input_channels) {
+	/* Convert the input image to the input image format of the network. */
+	for ( int iBatch = 0 ; iBatch < num_batch_ ; ++iBatch ){
+		cv::Mat sample;
+		if (imgVec[iBatch].channels() == 3 && num_channels_ == 1)
+			cv::cvtColor(imgVec[iBatch], sample, cv::COLOR_BGR2GRAY);
+		else if (imgVec[iBatch].channels() == 4 && num_channels_ == 1)
+			cv::cvtColor(imgVec[iBatch], sample, cv::COLOR_BGRA2GRAY);
+		else if (imgVec[iBatch].channels() == 4 && num_channels_ == 3)
+			cv::cvtColor(imgVec[iBatch], sample, cv::COLOR_BGRA2BGR);
+		else if (imgVec[iBatch].channels() == 1 && num_channels_ == 3)
+			cv::cvtColor(imgVec[iBatch], sample, cv::COLOR_GRAY2BGR);
+		else
+			sample = imgVec[iBatch];
 
-  cv::Mat sample_resized;
-  if (sample.size() != input_geometry_)
-    cv::resize(sample, sample_resized, input_geometry_);
-  else
-    sample_resized = sample;
+		cv::Mat sample_resized;
+		if (sample.size() != input_geometry_)
+			cv::resize(sample, sample_resized, input_geometry_);
+		else
+			sample_resized = sample;
 
-  cv::Mat sample_float;
-  if (num_channels_ == 3)
-    sample_resized.convertTo(sample_float, CV_32FC3);
-  else
-    sample_resized.convertTo(sample_float, CV_32FC1);
+		cv::Mat sample_float;
+		if (num_channels_ == 3)
+			sample_resized.convertTo(sample_float, CV_32FC3);
+		else
+			sample_resized.convertTo(sample_float, CV_32FC1);
 
-  cv::Mat sample_normalized;
-  cv::subtract(sample_float, mean_, sample_normalized);
+		cv::Mat sample_normalized;
+		cv::subtract(sample_float, mean_, sample_normalized);
 
-	cv::Mat sample_scaled;
-  if (num_channels_ == 3)
-		sample_normalized.convertTo( sample_scaled , CV_32FC3 , scale_factor_ );
-	else
-		sample_normalized.convertTo( sample_scaled , CV_32FC1 , scale_factor_ );
+		cv::Mat sample_scaled;
+		if (num_channels_ == 3)
+			sample_normalized.convertTo( sample_scaled , CV_32FC3 , scale_factor_ );
+		else
+			sample_normalized.convertTo( sample_scaled , CV_32FC1 , scale_factor_ );
 
-  /* This operation will write the separate BGR planes directly to the
-   * input layer of the network because it is wrapped by the cv::Mat
-   * objects in input_channels. */
-  cv::split(sample_scaled	, *input_channels);
+		std::vector<cv::Mat> img_split;
+		/* This operation will write the separate BGR planes directly to the
+		 * input layer of the network because it is wrapped by the cv::Mat
+		 * objects in input_channels. */
+		cv::split(sample_scaled	, img_split );
+		//cv::split(sample_scaled	, *input_channels);
 
-  CHECK(reinterpret_cast<float*>(input_channels->at(0).data)
-        == net_->input_blobs()[0]->cpu_data())
-    << "Input channels are not wrapping the input layer of the network.";
+		for ( int iC = 0 ; iC < num_channels_ ; ++iC )
+			(*input_channels)[iC + iBatch * num_channels_ ] = img_split[iC];
+	}
+	CHECK(reinterpret_cast<float*>(input_channels->at(0).data)
+			== net_->input_blobs()[0]->cpu_data())
+		<< "Input channels are not wrapping the input layer of the network.";
 }
 

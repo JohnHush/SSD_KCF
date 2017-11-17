@@ -171,10 +171,15 @@ int main(int argc, char** argv) {
 				{
 					Mat img_deepMAR( img , rect );
 
+					std::vector<cv::Mat> img_deepMAR_Vec(1);
+					img_deepMAR_Vec[0] = img_deepMAR;
+
 					mar_time_count ++;
 					timer.Start();
-					std::vector<int> results = classifier.Analyze( img_deepMAR );
+					std::vector<std::vector<int> > results_VEC = classifier.Analyze( img_deepMAR_Vec );
 					mar_time += timer.MilliSeconds();
+
+					std::vector<int> results = results_VEC[0];
 
 					int x_cor = rect.x;
 					int y_cor = rect.y + 20;

@@ -24,18 +24,19 @@ class MultiLabelClassifier{
 													const float& scale_factor,
 													caffe::Caffe::Brew mode = caffe::Caffe::CPU	);
 
-		std::vector<int> Analyze( const cv::Mat& img );
+		std::vector<std::vector<int> > Analyze( const std::vector<cv::Mat>& imgVec );
 
 	protected:
 		void SetMean(const string& mean_file, const string& mean_value);
 		void WrapInputLayer( std::vector<cv::Mat>* input_channels );
 
-		void Preprocess( const cv::Mat& img, std::vector<cv::Mat>* input_channels );
+		void Preprocess( const std::vector<cv::Mat>& imgVec, std::vector<cv::Mat>* input_channels );
 	
 	private:
 		shared_ptr<Net<float> > net_;
 		cv::Size input_geometry_;
 		int num_channels_;
+		int num_batch_;
 		cv::Mat mean_;
 		float scale_factor_;
 };
