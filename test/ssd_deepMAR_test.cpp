@@ -167,6 +167,9 @@ int main(int argc, char** argv) {
 			cv::putText( imgClone , show2 , cvPoint( rect.x , rect.y ) , cv::FONT_HERSHEY_SIMPLEX , 0.5, cvScalar(0,255,0) , 1 , 8 );
 		}
 
+		std::vector<std::pair< const vector<float> d , const cv::Rect rect > > personROI;
+		std::vector<cv::Mat> imgVec;
+
 		for (int i = 0; i < personD.size(); ++i)
 		{
 			const vector<float>& d = personD[i];
@@ -191,26 +194,40 @@ int main(int argc, char** argv) {
 			if ( rect.width<=0 || rect.height <= 0 )
 				continue;
 
-			string label = ssd_label_name[static_cast<int>(d[1])];
-			string score = std::to_string( d[2] );
+			personROI.push_back( std::make_pair( d , rect ));		
 
-			string show1 = label;
-			string show2 = std::string( "            " ) + score;
+			cv::Mat img_deepMAR( img , rect );
+			imgVec.resize( i+1 );
+			img_deepMAR.copyTo( imgVec[i] );
+		}	
+
+		mar_time_count ++;
+		timer.Start();
+		std::vector<std::vector<int> > results_Vec = classifier.Analyze( imgVec );
+		mar_time += timer.MilliSeconds();
+
+		for (int i = 0; i < personROI.size(); ++i)
+		{
+//			string label = ssd_label_name[static_cast<int>(d[1])];
+
+			const std::vector<float>& d = personROI[i].first;
+			const cv::Rect& rect = personROI[i].second;
+			string score = std::to_string( d[2] );
 
 			cv::rectangle( imgClone , rect , cv::Scalar( 0 , 0 , 255 ) , 2 );
 			cv::putText( imgClone , score , cvPoint( rect.x , rect.y ) , cv::FONT_HERSHEY_SIMPLEX , 0.5, cvScalar(0,0,255) , 1 , 8 );
 
-			Mat img_deepMAR( img , rect );
+//			Mat img_deepMAR( img , rect );
 
-			std::vector<cv::Mat> img_deepMAR_Vec(1);
-			img_deepMAR_Vec[0] = img_deepMAR;
+//			std::vector<cv::Mat> img_deepMAR_Vec(1);
+//			img_deepMAR_Vec[0] = img_deepMAR;
 
-			mar_time_count ++;
-			timer.Start();
-			std::vector<std::vector<int> > results_VEC = classifier.Analyze( img_deepMAR_Vec );
-			mar_time += timer.MilliSeconds();
+//			mar_time_count ++;
+//			timer.Start();
+//			std::vector<std::vector<int> > results_VEC = classifier.Analyze( img_deepMAR_Vec );
+//			mar_time += timer.MilliSeconds();
 
-			std::vector<int> results = results_VEC[0];
+			std::vector<int> results = results_VEC[i];
 
 			int x_cor = rect.x;
 			int y_cor = rect.y + 20;
