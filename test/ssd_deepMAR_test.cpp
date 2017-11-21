@@ -167,7 +167,7 @@ int main(int argc, char** argv) {
 			cv::putText( imgClone , show2 , cvPoint( rect.x , rect.y ) , cv::FONT_HERSHEY_SIMPLEX , 0.5, cvScalar(0,255,0) , 1 , 8 );
 		}
 
-		std::vector<std::pair< const vector<float> d , const cv::Rect rect > > personROI;
+		std::vector<std::pair< const vector<float> , const cv::Rect > > personROI;
 		std::vector<cv::Mat> imgVec;
 
 		for (int i = 0; i < personD.size(); ++i)
@@ -227,7 +227,7 @@ int main(int argc, char** argv) {
 //			std::vector<std::vector<int> > results_VEC = classifier.Analyze( img_deepMAR_Vec );
 //			mar_time += timer.MilliSeconds();
 
-			std::vector<int> results = results_VEC[i];
+			std::vector<int> results = results_Vec[i];
 
 			int x_cor = rect.x;
 			int y_cor = rect.y + 20;
