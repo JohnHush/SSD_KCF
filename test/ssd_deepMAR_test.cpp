@@ -1,6 +1,7 @@
-#include <opencv2/core/utility.hpp>
-#include <opencv2/videoio.hpp>
+#include <opencv2/core/core.hpp>
+#include <opencv2/video.hpp>
 #include <opencv2/highgui.hpp>
+#include <opencv2/opencv.hpp>
 #include <iostream>
 #include <caffe/proto/caffe.pb.h>
 #include <caffe/util/io.hpp>
@@ -11,7 +12,7 @@
 using cv::Ptr;
 using cv::VideoCapture;
 using cv::Mat;
-using cv::Rect2d;
+//using cv::Rect2d;
 using cv::Scalar;
 
 using std::string;
@@ -258,9 +259,10 @@ int main(int argc, char** argv) {
 		}
 		writer << imgClone;
 
-		//		cv::namedWindow( "bbox show" );
-		//		cv::imshow( "bbox show" , imgClone );
-		//		cv::waitKey(33);
+        std::cout << POS << std::endl;
+				//cv::namedWindow( "bbox show" );
+  //      imshow( "bbox show" , imgClone );
+   //     cvWaitKey(33);
 	}
 	LOG(INFO) << "ssd time = " << ssd_time/time_count << std::endl;
 	LOG(INFO) << "mar time = " << mar_time/mar_time_count << std::endl;
