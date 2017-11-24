@@ -203,8 +203,11 @@ int main(int argc, char** argv) {
 		}	
 
 		mar_time_count ++;
+		std::vector<std::vector<int> > results_Vec(0);
+
 		timer.Start();
-		std::vector<std::vector<int> > results_Vec = classifier.Analyze( imgVec );
+		if( imgVec.size() != 0 )
+			results_Vec = classifier.Analyze( imgVec );
 		mar_time += timer.MilliSeconds();
 
 		for (int i = 0; i < personROI.size(); ++i)
