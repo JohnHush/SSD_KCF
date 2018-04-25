@@ -1,13 +1,11 @@
-//#include <opencv2/core/core.hpp>
-//#include <opencv2/video.hpp>
-//#include <opencv2/highgui.hpp>
 #include <opencv2/opencv.hpp>
 #include <iostream>
 #include <caffe/proto/caffe.pb.h>
 #include <caffe/util/io.hpp>
 
-#include "ssd_detect.hpp"
+#include "api/api.hpp"
 #include "deepMAR.hpp"
+#include "caffe/FRCNN/util/frcnn_vis.hpp"
 
 using cv::Ptr;
 using cv::VideoCapture;
@@ -19,7 +17,6 @@ using std::string;
 using std::cout;
 using std::endl;
 
-DEFINE_bool( USE_GPU , true , "use GPU or not " );
 DEFINE_int32( skip , 10 , "skip frame of the input video" );
 DEFINE_string(mean_file, "",
 		"The mean file used to subtract from the input image.");
@@ -31,6 +28,13 @@ DEFINE_double(confidence_threshold, 0.5,
 		"Only store detections with score higher than the threshold.");
 DEFINE_double(scale ,  0.00390625,
 		"the scale factor when doing scale of the image");
+
+DEFINE_string( model, "", "The model definition protocol buffer text file." );
+DEFINE_string( weights, "", "Trained Model By Faster RCNN End-to-End Pipeline." );
+DEFINE_string( default_c, "", "Default config file path." );
+
+DEFINE_string( mar_model, "", "The model definition protocol buffer text file for MAR model" );
+DEFINE_string( mar_weights, "", "Trained Model By deepMAR" );
 
 int main(int argc, char** argv) {
 	::google::InitGoogleLogging(argv[0]);
@@ -47,28 +51,28 @@ int main(int argc, char** argv) {
 			"deepMAR_weights deepMAR_label VIDEO_FILE\n");
 	gflags::ParseCommandLineFlags(&argc, &argv, true);
 
-	if (argc < 8) {
+	if (argc < 2) {
 		gflags::ShowUsageWithFlagsRestrict(argv[0], "too little arguments");
 		return 1;
 	}
 
-	const string& ssd_model  = argv[1];
-	const string& ssd_weight = argv[2];
-	const string& ssd_label  = argv[3];
+  caffe::Caffe::SetDevice(0);
+  caffe::Caffe::set_mode(caffe::Caffe::GPU);
 
-	const string& mar_model  = argv[4];
-	const string& mar_weight = argv[5];
-	const string& mar_label  = argv[6];
+  std::string proto_file             = FLAGS_model.c_str();
+  std::string model_file             = FLAGS_weights.c_str();
+  std::string default_config_file    = FLAGS_default_c.c_str();
+
+  std::string mar_proto_file             = FLAGS_mar_model.c_str();
+  std::string mar_model_file             = FLAGS_mar_weights.c_str();
 
 	const string& mean_file = FLAGS_mean_file;
 	const string& mean_value = FLAGS_mean_value;
 	const float confidence_threshold = FLAGS_confidence_threshold;
 	const float scale = FLAGS_scale;
 	const int skip = FLAGS_skip;
-	const bool USE_GPU = FLAGS_USE_GPU;
-	caffe::Caffe::Brew mode = USE_GPU ? caffe::Caffe::GPU : caffe::Caffe::CPU;
 
-	const string& video_file = argv[7];
+	const string& video_file = argv[1];
 
 	VideoCapture cap( video_file );
 
@@ -77,24 +81,14 @@ int main(int argc, char** argv) {
 
 	Mat img;
 
-	map<int , string> ssd_label_name;
-	LabelMap ssd_label_map;
-	ReadProtoFromTextFile( ssd_label , &ssd_label_map );
-	CHECK( MapLabelToName( ssd_label_map , true , &ssd_label_name ) ) << "Duplicate labels";
-
-	map<int , string> mar_label_name;
-	LabelMap mar_label_map;
-	ReadProtoFromTextFile( mar_label , &mar_label_map  );
-	CHECK( MapLabelToName( mar_label_map , true, &mar_label_name ) ) << "Duplicate labels";
-
-	Detector detector( ssd_model , ssd_weight , mean_file, mean_value , mode);
-	MultiLabelClassifier classifier( mar_model , mar_weight ,	mean_file , mean_value , scale , mode );
+  API::Set_Config(default_config_file);
+  API::Detector detector(proto_file, model_file);
+	MultiLabelClassifier classifier( mar_proto_file , mar_model_file ,	mean_file , mean_value , scale, caffe::Caffe::GPU );
 
 	int video_width = cap.get( CV_CAP_PROP_FRAME_WIDTH );
 	int video_heigh = cap.get( CV_CAP_PROP_FRAME_HEIGHT);
 
 	cv::VideoWriter writer( "./default.avi" , CV_FOURCC('D','I','V','X') , 5 , cv::Size( video_width , video_heigh ) , true );
-	int totalFrame = cap.get( CV_CAP_PROP_FRAME_COUNT );
 	cap.set( CV_CAP_PROP_POS_FRAMES , 0 );
 	int POS = 0;
 
@@ -114,51 +108,36 @@ int main(int argc, char** argv) {
 		img.copyTo( imgClone );
 
 		timer.Start();
-		std::vector<vector<float> > detections = detector.Detect(img);
+
+    std::vector<caffe::Frcnn::BBox<float> > results;
+    detector.predict( img ,  results );
+
 		ssd_time += timer.MilliSeconds();
 
-		std::vector<vector<float> > passD(0);
-		std::vector<vector<float> > personD(0);
-		std::vector<vector<float> > othersD(0);
+		std::vector<caffe::Frcnn::BBox<float> > passD(0);
+		std::vector<caffe::Frcnn::BBox<float> > personD(0);
+		std::vector<caffe::Frcnn::BBox<float> > othersD(0);
 
-		for( int iBBOX = 0 ; iBBOX < detections.size() ; ++ iBBOX )
+		for( int iBBOX = 0 ; iBBOX < results.size() ; ++ iBBOX )
 		{
-			if ( detections[iBBOX][2] >= confidence_threshold )
+			if ( results[iBBOX].confidence >= confidence_threshold )
 			{
-				passD.push_back( detections[iBBOX] );
-				if ( ssd_label_name[static_cast<int>(detections[iBBOX][1])] == "1" )
-					personD.push_back( detections[iBBOX] );
+				passD.push_back( results[iBBOX] );
+				if ( results[iBBOX].id == 15 )
+					personD.push_back( results[iBBOX] );
 				else
-					othersD.push_back( detections[iBBOX] );
+					othersD.push_back( results[iBBOX] );
 			}
 		}
 
 		for ( int i = 0 ; i < othersD.size() ; ++i )
 		{
-			const vector<float>& d = othersD[i];
-			// Detection format: [image_id, label, score, xmin, ymin, xmax, ymax].
-			CHECK_EQ(d.size(), 7);
+			const caffe::Frcnn::BBox<float>& d = othersD[i];
 
-			int Lbb = d[3] * img.cols;
-			int Ubb = d[4] * img.rows;
-			int Rbb = d[5] * img.cols;
-			int Dbb = d[6] * img.rows;
+			cv::Rect rect( d[0] , d[1] , d[2] - d[0] , d[3] - d[1] );
 
-			if ( Lbb >= img.cols || Rbb < 0 || Ubb >= img.rows || Dbb < 0 )
-				continue;
-
-			Lbb = std::max( 0 , Lbb );
-			Ubb = std::max( 0 , Ubb );
-			Rbb = std::min( img.cols -1 , Rbb );
-			Dbb = std::min( img.rows -1 , Dbb );
-
-			cv::Rect rect( Lbb , Ubb , Rbb-Lbb , Dbb - Ubb );
-
-			if ( rect.width<=0 || rect.height <= 0 )
-				continue;
-
-			string label = ssd_label_name[static_cast<int>(d[1])];
-			string score = std::to_string( d[2] );
+      std::string label = caffe::Frcnn::GetClassName(caffe::Frcnn::LoadVocClass(), d.id);
+      std::string score = std::to_string( d.confidence );
 
 			string show1 = label;
 			string show2 = std::string( "            " ) + score;
@@ -168,34 +147,15 @@ int main(int argc, char** argv) {
 			cv::putText( imgClone , show2 , cvPoint( rect.x , rect.y ) , cv::FONT_HERSHEY_SIMPLEX , 0.5, cvScalar(0,255,0) , 1 , 8 );
 		}
 
-		std::vector<std::pair< const vector<float> , const cv::Rect > > personROI;
+		std::vector<std::pair< const caffe::Frcnn::BBox<float> , const cv::Rect > > personROI;
 		std::vector<cv::Mat> imgVec;
 
 		for (int i = 0; i < personD.size(); ++i)
 		{
-			const vector<float>& d = personD[i];
-			// Detection format: [image_id, label, score, xmin, ymin, xmax, ymax].
-			CHECK_EQ(d.size(), 7);
+			const caffe::Frcnn::BBox<float>& d = personD[i];
 
-			int Lbb = d[3] * img.cols;
-			int Ubb = d[4] * img.rows;
-			int Rbb = d[5] * img.cols;
-			int Dbb = d[6] * img.rows;
-
-			if ( Lbb >= img.cols || Rbb < 0 || Ubb >= img.rows || Dbb < 0 )
-				continue;
-
-			Lbb = std::max( 0 , Lbb );
-			Ubb = std::max( 0 , Ubb );
-			Rbb = std::min( img.cols -1 , Rbb );
-			Dbb = std::min( img.rows -1 , Dbb );
-
-			cv::Rect rect( Lbb , Ubb , Rbb-Lbb , Dbb - Ubb );
-
-			if ( rect.width<=0 || rect.height <= 0 )
-				continue;
-
-			personROI.push_back( std::make_pair( d , rect ));		
+			cv::Rect rect( d[0] , d[1] , d[2] - d[0] , d[3] - d[1] );
+			personROI.push_back( std::make_pair( d , rect ));
 
 			cv::Mat img_deepMAR( img , rect );
 			imgVec.resize( i+1 );
@@ -212,40 +172,30 @@ int main(int argc, char** argv) {
 
 		for (int i = 0; i < personROI.size(); ++i)
 		{
-//			string label = ssd_label_name[static_cast<int>(d[1])];
-
-			const std::vector<float>& d = personROI[i].first;
+			const caffe::Frcnn::BBox<float>& d = personROI[i].first;
 			const cv::Rect& rect = personROI[i].second;
-			string score = std::to_string( d[2] );
+			string score = std::to_string( d.confidence );
 
 			cv::rectangle( imgClone , rect , cv::Scalar( 0 , 0 , 255 ) , 2 );
 			cv::putText( imgClone , score , cvPoint( rect.x , rect.y ) , cv::FONT_HERSHEY_SIMPLEX , 0.5, cvScalar(0,0,255) , 1 , 8 );
 
-//			Mat img_deepMAR( img , rect );
-
-//			std::vector<cv::Mat> img_deepMAR_Vec(1);
-//			img_deepMAR_Vec[0] = img_deepMAR;
-
-//			mar_time_count ++;
-//			timer.Start();
-//			std::vector<std::vector<int> > results_VEC = classifier.Analyze( img_deepMAR_Vec );
-//			mar_time += timer.MilliSeconds();
-
-			std::vector<int> results = results_Vec[i];
+			std::vector<int> att_results = results_Vec[i];
 
 			int x_cor = rect.x;
 			int y_cor = rect.y + 20;
 
-			for ( int iattribute = 0 ; iattribute < results.size() ; ++ iattribute )
+			for ( int iattribute = 0 ; iattribute < att_results.size() ; ++ iattribute )
 			{
-				if ( results[iattribute] != 0 || iattribute == 0 )
+        // we just show positive attributes or the gender
+				if ( att_results[iattribute] != 0 || iattribute == 0 )
 				{
 					y_cor += 30;
 
-					string attribute = mar_label_name[ iattribute+1 ];
-					if ( results[0] == 0 && iattribute == 0 )
+					string attribute = caffe::Frcnn::GetClassName( caffe::Frcnn::LoadPA100Class() , iattribute );
+					if ( att_results[0] == 0 && iattribute == 0 )
 						attribute = string("Male");
 
+          // make some background color
 					cv::Rect rect_tmp( x_cor , y_cor-15 , 100 , 20 );
 					if( x_cor < 0 || y_cor-15 < 0 || 
 							x_cor+100 >= imgClone.size().width || y_cor-15 +20>=imgClone.size().height)
@@ -262,10 +212,10 @@ int main(int argc, char** argv) {
 		}
 		writer << imgClone;
 
-        std::cout << POS << std::endl;
-				//cv::namedWindow( "bbox show" );
+    std::cout << POS << std::endl;
+	//cv::namedWindow( "bbox show" );
   //      imshow( "bbox show" , imgClone );
-   //     cvWaitKey(33);
+  //     cvWaitKey(33);
 	}
 	LOG(INFO) << "ssd time = " << ssd_time/time_count << std::endl;
 	LOG(INFO) << "mar time = " << mar_time/mar_time_count << std::endl;

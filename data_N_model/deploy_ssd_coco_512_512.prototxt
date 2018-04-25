@@ -1793,7 +1793,7 @@ layer {
       top_k: 400
     }
     save_output_param {
-      label_map_file: "/home/jh/working_pros/SSD_KCF/data_N_model/labelmap_coco.prototxt"
+      label_map_file: "/home/jh/working_pros/ssd_kcf/data_N_model/labelmap_coco.prototxt"
     }
     code_type: CENTER_SIZE
     keep_top_k: 200
