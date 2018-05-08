@@ -7,6 +7,8 @@
 #include "deepMAR.hpp"
 #include "caffe/FRCNN/util/frcnn_vis.hpp"
 
+#include "opencv2/core/version.hpp"
+
 using cv::Ptr;
 using cv::VideoCapture;
 using cv::Mat;
@@ -85,11 +87,23 @@ int main(int argc, char** argv) {
   API::Detector detector(proto_file, model_file);
 	MultiLabelClassifier classifier( mar_proto_file , mar_model_file ,	mean_file , mean_value , scale, caffe::Caffe::GPU );
 
-	int video_width = cap.get( CV_CAP_PROP_FRAME_WIDTH );
-	int video_heigh = cap.get( CV_CAP_PROP_FRAME_HEIGHT);
+#if CV_MAJOR_VERSION == 2
+  int cap_frame_width_flag = CV_CAP_PROP_FRAME_WIDTH;
+  int cap_frame_height_flag = CV_CAP_PROP_FRAME_HEIGHT;
+  int cap_fourcc_flag = CV_FOURCC('D','I','V','X');
+  int cap_frame_prop_flag = CV_CAP_PROP_POS_FRAMES;
+#elif ( CV_MAJOR_VERSION == 3 || CV_MAJOR_VERSION == 4 )
+  int cap_frame_width_flag = cv::CAP_PROP_FRAME_WIDTH;
+  int cap_frame_height_flag = cv::CAP_PROP_FRAME_HEIGHT;
+  int cap_fourcc_flag = cv::VideoWriter::fourcc('D','I','V','X');
+  int cap_frame_prop_flag = cv::CAP_PROP_POS_FRAMES;
+#endif
 
-	cv::VideoWriter writer( "./default.avi" , CV_FOURCC('D','I','V','X') , 5 , cv::Size( video_width , video_heigh ) , true );
-	cap.set( CV_CAP_PROP_POS_FRAMES , 0 );
+	int video_width = cap.get( cap_frame_width_flag );
+	int video_heigh = cap.get( cap_frame_height_flag );
+
+	cv::VideoWriter writer( "./default.avi" , cap_fourcc_flag , 5 , cv::Size( video_width , video_heigh ) , true );
+	cap.set( cap_frame_prop_flag , 0 );
 	int POS = 0;
 
 	caffe::Timer timer;
@@ -102,7 +116,7 @@ int main(int argc, char** argv) {
 	{
 		time_count ++;
 		POS += skip;
-		cap.set( CV_CAP_PROP_POS_FRAMES , POS );
+		cap.set( cap_frame_prop_flag , POS );
 
 		Mat imgClone;
 		img.copyTo( imgClone );
@@ -143,8 +157,8 @@ int main(int argc, char** argv) {
 			string show2 = std::string( "            " ) + score;
 
 			cv::rectangle( imgClone , rect , cv::Scalar( 0 , 255 , 0 ) , 2 );
-			cv::putText( imgClone , show1 , cvPoint( rect.x , rect.y ) , cv::FONT_HERSHEY_SIMPLEX , 0.5, cvScalar(0,255,0) , 1 , 8 );
-			cv::putText( imgClone , show2 , cvPoint( rect.x , rect.y ) , cv::FONT_HERSHEY_SIMPLEX , 0.5, cvScalar(0,255,0) , 1 , 8 );
+			cv::putText( imgClone , show1 , cv::Point( rect.x , rect.y ) , cv::FONT_HERSHEY_SIMPLEX , 0.5, cv::Scalar(0,255,0) , 1 , 8 );
+			cv::putText( imgClone , show2 , cv::Point( rect.x , rect.y ) , cv::FONT_HERSHEY_SIMPLEX , 0.5, cv::Scalar(0,255,0) , 1 , 8 );
 		}
 
 		std::vector<std::pair< const caffe::Frcnn::BBox<float> , const cv::Rect > > personROI;
@@ -177,7 +191,7 @@ int main(int argc, char** argv) {
 			string score = std::to_string( d.confidence );
 
 			cv::rectangle( imgClone , rect , cv::Scalar( 0 , 0 , 255 ) , 2 );
-			cv::putText( imgClone , score , cvPoint( rect.x , rect.y ) , cv::FONT_HERSHEY_SIMPLEX , 0.5, cvScalar(0,0,255) , 1 , 8 );
+			cv::putText( imgClone , score , cv::Point( rect.x , rect.y ) , cv::FONT_HERSHEY_SIMPLEX , 0.5, cv::Scalar(0,0,255) , 1 , 8 );
 
 			std::vector<int> att_results = results_Vec[i];
 
@@ -206,7 +220,7 @@ int main(int argc, char** argv) {
 						for( int icol =0 ; icol < 3*imgCloneROI.cols ; ++ icol )
 							imgCloneROI.at<uchar>(irow,icol) = uchar(imgCloneROI.at<uchar>(irow,icol )/3 + 32 );
 
-					cv::putText( imgClone , attribute , cvPoint( x_cor , y_cor ) , cv::FONT_HERSHEY_SIMPLEX , 0.5, cvScalar(255,255,255) , 1 , 8 );
+					cv::putText( imgClone , attribute , cv::Point( x_cor , y_cor ) , cv::FONT_HERSHEY_SIMPLEX , 0.5, cv::Scalar(255,255,255) , 1 , 8 );
 				}
 			}
 		}

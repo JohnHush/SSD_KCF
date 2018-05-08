@@ -19,7 +19,7 @@ set( CMAKE_INSTALL_PREFIX ${CMAKE_CURRENT_BINARY_DIR}/install )
 set( UNBUILDING_TRACKING ON )
 
 include( /home/jh/working_lib/caffe/build/install/share/Caffe/CaffeConfig.cmake )
-include( /usr/share/OpenCV/OpenCVConfig.cmake )
+include( /usr/local/share/OpenCV/OpenCVConfig.cmake )
 
 #set( OPENCVLIBS optimized /usr/local/lib/libopencv_tracking.dylib 
 #		debug /usr/local/lib/libopencv_tracking.dylib )
