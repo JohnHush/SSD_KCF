@@ -36,8 +36,12 @@ int main(int argc, char** argv) {
     return 1;
   }
 
+#ifndef MacOS
   caffe::Caffe::SetDevice(0);
   caffe::Caffe::set_mode(caffe::Caffe::GPU);
+#else
+  caffe::Caffe::set_mode(caffe::Caffe::CPU);
+#endif
 
   std::string proto_file             = FLAGS_model.c_str();
   std::string model_file             = FLAGS_weights.c_str();
