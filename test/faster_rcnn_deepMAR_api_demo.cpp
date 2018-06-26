@@ -9,7 +9,7 @@
 
 #include "opencv2/core/version.hpp"
 
-using cv::Ptr;
+//using cv::Ptr;
 using cv::VideoCapture;
 using cv::Mat;
 //using cv::Rect2d;
@@ -57,9 +57,12 @@ int main(int argc, char** argv) {
 		gflags::ShowUsageWithFlagsRestrict(argv[0], "too little arguments");
 		return 1;
 	}
-
+#ifndef MacOS
   caffe::Caffe::SetDevice(0);
   caffe::Caffe::set_mode(caffe::Caffe::GPU);
+#else
+  caffe::Caffe::set_mode(caffe::Caffe::CPU);
+#endif
 
   std::string proto_file             = FLAGS_model.c_str();
   std::string model_file             = FLAGS_weights.c_str();
@@ -85,7 +88,12 @@ int main(int argc, char** argv) {
 
   API::Set_Config(default_config_file);
   API::Detector detector(proto_file, model_file);
-	MultiLabelClassifier classifier( mar_proto_file , mar_model_file ,	mean_file , mean_value , scale, caffe::Caffe::GPU );
+#ifdef MacOS
+  caffe::Caffe::Brew mode = caffe::Caffe::CPU;
+#else
+  caffe::Caffe::Brew mode = caffe::Caffe::GPU;
+#endif
+	MultiLabelClassifier classifier( mar_proto_file , mar_model_file ,	mean_file , mean_value , scale, mode );
 
 #if CV_MAJOR_VERSION == 2
   int cap_frame_width_flag = CV_CAP_PROP_FRAME_WIDTH;

@@ -2,6 +2,9 @@ cmake_minimum_required( VERSION 3.0 )
 
 project( SSD_API C CXX )
 
+if( APPLE )
+  add_definitions( -DMacOS )
+endif( APPLE )
 
 include(CheckCXXCompilerFlag)  
 CHECK_CXX_COMPILER_FLAG("-std=c++11" COMPILER_SUPPORTS_CXX11)  
@@ -18,8 +21,12 @@ endif()
 set( CMAKE_INSTALL_PREFIX ${CMAKE_CURRENT_BINARY_DIR}/install )
 set( UNBUILDING_TRACKING ON )
 
+if( APPLE )
+include( /Users/pitaloveu/working_libs/caffe/build/install/share/Caffe/CaffeConfig.cmake )
+elseif()
 include( /home/jh/working_lib/caffe/build/install/share/Caffe/CaffeConfig.cmake )
-include( /usr/local/share/OpenCV/OpenCVConfig.cmake )
+endif()
+#include( /usr/local/share/OpenCV/OpenCVConfig.cmake )
 
 #set( OPENCVLIBS optimized /usr/local/lib/libopencv_tracking.dylib 
 #		debug /usr/local/lib/libopencv_tracking.dylib )
