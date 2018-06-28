@@ -25,6 +25,8 @@ class MultiLabelClassifier{
 													caffe::Caffe::Brew mode = caffe::Caffe::CPU	);
 
 		std::vector<std::vector<int> > Analyze( const std::vector<cv::Mat>& imgVec );
+		std::vector<std::vector<int> > Analyze( const std::vector<cv::Mat>& imgVec,
+                std::vector<std::vector<float> >& prob );
 
 	protected:
 		void SetMean(const string& mean_file, const string& mean_value);

@@ -61,6 +61,49 @@ std::vector<std::vector<int> > MultiLabelClassifier::Analyze( const std::vector<
 	return att_vec;
 }
 
+std::vector<std::vector<int> > MultiLabelClassifier::Analyze( 
+    const std::vector<cv::Mat>& imgVec,
+    std::vector<std::vector<float> >& prob )
+{
+	num_batch_ = imgVec.size();
+  Blob<float>* input_layer = net_->input_blobs()[0];
+  input_layer->Reshape( num_batch_ , num_channels_,
+                       input_geometry_.height, input_geometry_.width);
+  /* Forward dimension change to all layers. */
+  net_->Reshape();
+
+  std::vector<cv::Mat> input_channels;
+  WrapInputLayer(&input_channels);
+
+  Preprocess(imgVec, &input_channels);
+  net_->Forward();
+
+  /* Copy the output layer to a std::vector */
+  Blob<float>* result_blob = net_->output_blobs()[0];
+  const float* result = result_blob->cpu_data();
+	const int num_att = result_blob->count() / num_batch_;
+	std::vector<std::vector<int> > att_vec(0);
+  prob.clear();
+
+	for( int iBatch = 0 ; iBatch < num_batch_ ; ++ iBatch )
+	{
+		std::vector<int> att_tmp(0);
+    std::vector<float> att_tmp_float(0);
+
+		for ( int k = 0 ; k < num_att ; ++k )
+    {
+			att_tmp.push_back( static_cast<int>( result[k]>0.5 ) );
+			att_tmp_float.push_back( static_cast<float>( result[k] ) );
+    }
+
+		att_vec.push_back( att_tmp );
+    prob.push_back( att_tmp_float );
+		result += num_att;
+	}
+
+	return att_vec;
+}
+
 /* Load the mean file in binaryproto format. */
 void MultiLabelClassifier::SetMean(const string& mean_file, const string& mean_value) {
   cv::Scalar channel_mean;
