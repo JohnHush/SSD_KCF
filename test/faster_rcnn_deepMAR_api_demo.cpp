@@ -2,6 +2,7 @@
 #include <iostream>
 #include <caffe/proto/caffe.pb.h>
 #include <caffe/util/io.hpp>
+#include <sstream>
 
 #include "api/api.hpp"
 #include "deepMAR.hpp"
@@ -18,6 +19,7 @@ using cv::Scalar;
 using std::string;
 using std::cout;
 using std::endl;
+using std::stringstream;
 
 DEFINE_int32( skip , 10 , "skip frame of the input video" );
 DEFINE_string(mean_file, "",
@@ -37,6 +39,8 @@ DEFINE_string( default_c, "", "Default config file path." );
 
 DEFINE_string( mar_model, "", "The model definition protocol buffer text file for MAR model" );
 DEFINE_string( mar_weights, "", "Trained Model By deepMAR" );
+
+DEFINE_string( output_dir , "./img_dir" , "image dir to store detected images" );
 
 int main(int argc, char** argv) {
 	::google::InitGoogleLogging(argv[0]);
@@ -70,6 +74,8 @@ int main(int argc, char** argv) {
 
   std::string mar_proto_file             = FLAGS_mar_model.c_str();
   std::string mar_model_file             = FLAGS_mar_weights.c_str();
+
+  std::string output_dir = FLAGS_output_dir.c_str();
 
 	const string& mean_file = FLAGS_mean_file;
 	const string& mean_value = FLAGS_mean_value;
@@ -109,6 +115,8 @@ int main(int argc, char** argv) {
 
 	int video_width = cap.get( cap_frame_width_flag );
 	int video_heigh = cap.get( cap_frame_height_flag );
+
+  stringstream file_name;
 
 	cv::VideoWriter writer( "./default.avi" , cap_fourcc_flag , 5 , cv::Size( video_width , video_heigh ) , true );
 	cap.set( cap_frame_prop_flag , 0 );
@@ -176,10 +184,23 @@ int main(int argc, char** argv) {
 		{
 			const caffe::Frcnn::BBox<float>& d = personD[i];
 
+      // cv::Rect( x, y, width, height )
 			cv::Rect rect( d[0] , d[1] , d[2] - d[0] , d[3] - d[1] );
 			personROI.push_back( std::make_pair( d , rect ));
 
 			cv::Mat img_deepMAR( img , rect );
+
+      // write sub images into a user defined directory
+      // the jpg name in a form frameID_x_y_w_h_.jpg
+      file_name.str("");
+
+      file_name <<output_dir << "/" <<  POS << "_" << rect.x << "_" << rect.y <<
+        "_" << rect.width << "_" << rect.height << "_" <<".jpg";
+
+      std::cout << file_name.str() << std::endl;
+
+      cv::imwrite( file_name.str() , img_deepMAR );
+
 			imgVec.resize( i+1 );
 			img_deepMAR.copyTo( imgVec[i] );
 		}	

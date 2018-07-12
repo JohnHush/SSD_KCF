@@ -17,7 +17,7 @@ foreach( source ${tests} )
 
   if( APPLE )
     target_link_libraries( ${name} ssd_wrapper /Users/pitaloveu/working_libs/caffe/build/install/lib/libFRCNN_api.dylib ${Caffe_LIBRARIES} ${OPENCVLIBS})
-  elseif()
+  else()
     target_link_libraries( ${name} ssd_wrapper /home/jh/working_lib/caffe/build/install/lib/libFRCNN_api.so ${Caffe_LIBRARIES} ${OPENCVLIBS})
   endif()
 

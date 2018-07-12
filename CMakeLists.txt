@@ -23,7 +23,7 @@ set( UNBUILDING_TRACKING ON )
 
 if( APPLE )
 include( /Users/pitaloveu/working_libs/caffe/build/install/share/Caffe/CaffeConfig.cmake )
-elseif()
+else()
 include( /home/jh/working_lib/caffe/build/install/share/Caffe/CaffeConfig.cmake )
 endif()
 #include( /usr/local/share/OpenCV/OpenCVConfig.cmake )
