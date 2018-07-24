@@ -10,10 +10,8 @@
 
 #include "opencv2/core/version.hpp"
 
-//using cv::Ptr;
 using cv::VideoCapture;
 using cv::Mat;
-//using cv::Rect2d;
 using cv::Scalar;
 
 using std::string;
@@ -106,15 +104,20 @@ int main(int argc, char** argv) {
   int cap_frame_height_flag = CV_CAP_PROP_FRAME_HEIGHT;
   int cap_fourcc_flag = CV_FOURCC('D','I','V','X');
   int cap_frame_prop_flag = CV_CAP_PROP_POS_FRAMES;
+  int cap_total_frame = CV_CAP_PROP_FRAME_COUNT;
 #elif ( CV_MAJOR_VERSION == 3 || CV_MAJOR_VERSION == 4 )
   int cap_frame_width_flag = cv::CAP_PROP_FRAME_WIDTH;
   int cap_frame_height_flag = cv::CAP_PROP_FRAME_HEIGHT;
   int cap_fourcc_flag = cv::VideoWriter::fourcc('D','I','V','X');
   int cap_frame_prop_flag = cv::CAP_PROP_POS_FRAMES;
+  int cap_total_frame = cv::CAP_PROP_FRAME_COUNT;
 #endif
 
 	int video_width = cap.get( cap_frame_width_flag );
 	int video_heigh = cap.get( cap_frame_height_flag );
+  int total_frame = cap.get( cap_total_frame );
+
+  std::cout << "total frame is " << total_frame << std::endl;
 
   stringstream file_name;
 
@@ -180,8 +183,10 @@ int main(int argc, char** argv) {
 		std::vector<std::pair< const caffe::Frcnn::BBox<float> , const cv::Rect > > personROI;
 		std::vector<cv::Mat> imgVec;
 
+    int personNum = 0;
 		for (int i = 0; i < personD.size(); ++i)
 		{
+      personNum ++;
 			const caffe::Frcnn::BBox<float>& d = personD[i];
 
       // cv::Rect( x, y, width, height )
@@ -194,8 +199,12 @@ int main(int argc, char** argv) {
       // the jpg name in a form frameID_x_y_w_h_.jpg
       file_name.str("");
 
-      file_name <<output_dir << "/" <<  POS << "_" << rect.x << "_" << rect.y <<
-        "_" << rect.width << "_" << rect.height << "_" <<".jpg";
+      // write the cropped images respect to the bbox
+      // the file name in a format:
+      //     frameID_X_Y_W_H_cameraID_frameHeight_frameWidth_numIDinFrame.jpg
+      file_name << output_dir << "/" <<  POS << "_" << rect.x << "_" << rect.y <<
+        "_" << rect.width << "_" << rect.height << "_" << video_file <<
+        "_" << video_width << "_" << video_heigh << "_" << personNum <<".jpg";
 
       std::cout << file_name.str() << std::endl;
 
