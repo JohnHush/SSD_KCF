@@ -3,12 +3,22 @@
 #include <caffe/proto/caffe.pb.h>
 #include <caffe/util/io.hpp>
 #include <sstream>
+#include <string>
 
 #include "api/api.hpp"
 #include "deepMAR.hpp"
 #include "caffe/FRCNN/util/frcnn_vis.hpp"
 
 #include "opencv2/core/version.hpp"
+
+void split( std::istream* is , std::vector<std::string>& split_vec, 
+    char delim )
+{
+  split_vec.clear();
+  std::string tmp;
+  while( std::getline( *is , tmp , delim ) )
+    split_vec.push_back( tmp );
+}
 
 using cv::VideoCapture;
 using cv::Mat;
@@ -84,6 +94,16 @@ int main(int argc, char** argv) {
 	const string& video_file = argv[1];
 
 	VideoCapture cap( video_file );
+
+  std::stringstream sss( video_file );
+  std::vector< std::string > video_name_vec;
+  split( &sss , video_name_vec , '/' );
+  string video_name_changed;
+  for ( int i = 0 ; i < video_name_vec.size() ; i++ )
+  {
+    video_name_changed += video_name_vec[i];
+    video_name_changed += "-";
+  }
 
 	if( !cap.isOpened() )
 		cout << "fail to open the video " << endl;
@@ -203,7 +223,7 @@ int main(int argc, char** argv) {
       // the file name in a format:
       //     frameID_X_Y_W_H_cameraID_frameHeight_frameWidth_numIDinFrame.jpg
       file_name << output_dir << "/" <<  POS << "_" << rect.x << "_" << rect.y <<
-        "_" << rect.width << "_" << rect.height << "_" << video_file <<
+        "_" << rect.width << "_" << rect.height << "_" << video_name_changed <<
         "_" << video_width << "_" << video_heigh << "_" << personNum <<".jpg";
 
       std::cout << file_name.str() << std::endl;
