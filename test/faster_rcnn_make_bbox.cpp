@@ -63,6 +63,7 @@ int main(int argc, char** argv) {
 	// Print output to stderr (while still logging)
 	FLAGS_alsologtostderr = 1;
 
+
 #ifndef GFLAGS_GFLAGS_H_
 	namespace gflags = google;
 #endif
@@ -101,6 +102,15 @@ int main(int argc, char** argv) {
     std::vector<std::string> helper_split_vec;
 
     split( &helper_ss , helper_split_vec , ' ' );
+
+    std::cout << helper_split_vec.size() << std::endl;
+
+    // change the synbol '/' in the split vec to '*'
+    for( std::string::iterator it = helper_split_vec[1].begin() ;
+        it != helper_split_vec[1].end() ; ++ it )
+      if( *it == '/' )
+        *it = '*';
+
     PATH_SHOW_MAP[ helper_split_vec[0] ] = helper_split_vec[1];
   }
 
@@ -116,6 +126,7 @@ int main(int argc, char** argv) {
 	const int skip = FLAGS_skip;
 
   API::Set_Config(default_config_file);
+  printf( "2\n" );
   API::Detector detector(proto_file, model_file);
 #ifdef MacOS
   caffe::Caffe::Brew mode = caffe::Caffe::CPU;
