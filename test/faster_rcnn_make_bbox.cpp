@@ -87,21 +87,22 @@ int main(int argc, char** argv) {
 #endif
 
   // get the Video Name Map
-  std::string fname( "camera_info.txt" );
+  std::string fname( "out_info.txt" );
   std::vector<std::string> video_path_name;
   parse_txt( fname , video_path_name );
 
-  std::stringstream helper_ss;
   std::map< std::string , std::string > PATH_SHOW_MAP;
   
   for( std::vector<std::string>::iterator it = video_path_name.begin() ; 
       it != video_path_name.end() ; ++ it )
   {
-    // clear helper_ss
+    std::stringstream helper_ss;
     helper_ss.str( *it );
-    std::vector<std::string> helper_split_vec;
 
+    std::vector<std::string> helper_split_vec;
     split( &helper_ss , helper_split_vec , ' ' );
+
+    std::cout << *it << std::endl;
 
     std::cout << helper_split_vec.size() << std::endl;
 
