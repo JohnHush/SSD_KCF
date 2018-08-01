@@ -42,13 +42,9 @@ void split( std::istream* is , std::vector<std::string>& split_vec,
 }
 
 
+DEFINE_string( video_info , "" , "video info txt file, in a form:
+                                    video_file_path  video_name" );
 DEFINE_int32( skip , 10 , "skip frame of the input video" );
-DEFINE_string(mean_file, "",
-		"The mean file used to subtract from the input image.");
-DEFINE_string(mean_value, "104,117,123",
-		"If specified, can be one value or can be same as image channels"
-		" - would subtract from the corresponding channel). Separated by ','."
-		"Either mean_file or mean_value should be provided, not both.");
 DEFINE_double(confidence_threshold, 0.5,
 		"Only store detections with score higher than the threshold.");
 
@@ -87,7 +83,7 @@ int main(int argc, char** argv) {
 #endif
 
   // get the Video Name Map
-  std::string fname( "out_info.txt" );
+  std::string fname( FLAGS_video_info );
   std::vector<std::string> video_path_name;
   parse_txt( fname , video_path_name );
 
@@ -121,8 +117,6 @@ int main(int argc, char** argv) {
 
   std::string output_dir = FLAGS_output_dir.c_str();
 
-	const string& mean_file = FLAGS_mean_file;
-	const string& mean_value = FLAGS_mean_value;
 	const float confidence_threshold = FLAGS_confidence_threshold;
 	const int skip = FLAGS_skip;
 
@@ -160,7 +154,7 @@ int main(int argc, char** argv) {
 
 	  double ssd_time =0.;
 	  int time_count =0;
-	  int POS = 0;
+	  int POS = 190000;
 	  int video_width = cap.get( cap_frame_width_flag );
 	  int video_heigh = cap.get( cap_frame_height_flag );
 
